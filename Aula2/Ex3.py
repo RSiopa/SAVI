@@ -12,7 +12,7 @@ def main():
     res = cv2.matchTemplate(image, template, cv2.TM_CCOEFF)
     _, _, _, max_loc = cv2.minMaxLoc(res)
 
-    top_left = max_lo
+    top_left = max_loc
     h, w, _ = template.shape
 
     bottom_right = (top_left[0] + w, top_left[1] + h)
