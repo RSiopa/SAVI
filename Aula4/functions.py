@@ -28,16 +28,19 @@ class BoundingBox:
 
         return A_intr / A_union
 
+    def extractSmallImage(self, image_full):
+        return image_full[self.y1:self.y1+self.h, self.x1:self.x1+self.w]
+
+
 
 class Detection(BoundingBox):
 
-    def __init__(self, x1, y1, w, h, image_full, id):
+    def __init__(self, x1, y1, w, h, image_full, id, stamp):
         super().__init__(x1, y1, w, h)
         self.id = id
-        self.extractSmallImage(image_full)
-
-    def extractSmallImage(self, image_full):
-        self.image = image_full[self.y1:self.y1+self.h, self.x1:self.x1+self.w]
+        self.stamp = stamp
+        self.image = self.extractSmallImage(image_full)
+        self.assigned_to_tracker = False
 
     def draw(self, image_gui, color=(255, 0, 0)):
         cv2.rectangle(image_gui, (self.x1, self.y1), (self.x2, self.y2), color, 3)
@@ -47,19 +50,68 @@ class Detection(BoundingBox):
 
 class Tracker:
 
-    def __init__(self, detection, id):
-        self.detections = [detection]
+    def __init__(self, detection, id, image):
         self.id = id
+        self.active = None
+        self.template = None
+        self.bboxes = []
+        self.detections = []
+        ###self.tracker = cv2.TrackerCSRT_create()
+        self.addDetection(detection, image)
+        self.time_since_last_detection = None
 
-    def draw(self, image_gui, color=(255, 0, 255)):
+    def getLastDetectionStamp(self):
+        return self.detections[-1].stamp
+
+    def updateTime(self):
+        self.time_since_last_detection = round(stamp-self.getLastDetectionStamp(), 1)
+
+        if self.time_since_last_detection > 2:
+            self.active = False
+
+    def drawLastDetection(self, image_gui, color=(255, 0, 255)):
         last_detection = self.detections[-1]
 
         cv2.rectangle(image_gui, (last_detection.x1, last_detection.y1), (last_detection.x2, last_detection.y2), color, 3)
 
         image = cv2.putText(image_gui, 'T' + str(self.id), (last_detection.x2 - 40, last_detection.y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2, cv2.LINE_AA)
 
-    def addDetection(self, detection):
+    def draw(self, image_gui, color=(255, 0, 255)):
+
+        if not self.active:
+            color = (100, 100, 100)
+
+        bbox = self.bboxes[-1]
+
+        cv2.rectangle(image_gui, (bbox.x1, bbox.y1), (bbox.x2, bbox.y2), color, 3)
+
+        cv2.putText(image_gui, 'T' + str(self.id), (bbox.x2 - 40, bbox.y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2, cv2.LINE_AA)
+
+        cv2.putText(image_gui, str(self.id), (bbox.x2 - 40, bbox.y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2, cv2.LINE_AA)
+
+
+    def addDetection(self, detection, image):
+
+        self.tracker.init(image, detection.x1, detection.y1, detection.w, detection.h)
+
         self.detections.append(detection)
+        detection.assigned_to_tracker = True
+        self.template = detection.image
+        bbox = BoundingBox(detection.x1, detection.y1, detection.w, detection.h)
+        self.bboxes.append(bbox)
+
+    def track(self, image):
+        h, w = self.template.shape
+        res = cv2.matchTemplate(image, self.template, cv2.TM_CCOEFF)
+        _, _, _, max_loc = cv2.minMaxLoc(res)
+
+        x1 = max_loc[0]
+        y1 = max_loc[1]
+
+        bbox = BoundingBox(x1, y1, w, h)
+        self.bboxes.append(bbox)
+
+        self.template = bbox.extractSmallImage(image)
 
     def __str__(self):
         text = 'T' + str(self.id) + ' Detections = ['
