@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 
 from __future__ import print_function
+
 from copy import deepcopy
 from random import randint
+
 import cv2
+import argparse
 import numpy as np
+import csv
+import matplotlib.pyplot as plt
 
 
 def main():
@@ -14,13 +19,11 @@ def main():
     # -----------------------------------------------------
 
     # Start video
-    image1 = cv2.imread("../Aula6/images/machu_pichu/2.png")
-    image2 = cv2.imread("../Aula6/images/machu_pichu/1.png")
+    image1 = cv2.imread("../Aula6/images/castle/1.png")
+    image2 = cv2.imread("../Aula6/images/castle/original.jpg")
 
-    # Sift with 500 points
     sift = cv2.SIFT_create(500)
 
-    # Window creation
     window_name1 = 'image_matching'
     cv2.namedWindow(window_name1, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(window_name1, 800, 600)
@@ -33,7 +36,6 @@ def main():
     cv2.namedWindow(window_name3, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(window_name3, 800, 600)
 
-    # Variables
     MIN_MATCH_COUNT = 10
 
     # -----------------------------------------------------
@@ -82,8 +84,8 @@ def main():
         if best_match.distance < 0.7 * second_best_match.distance:
             good.append(best_match)
 
-    # findHomography/perspectiveTransform
     if len(good) > MIN_MATCH_COUNT:
+        # Create 2 point lists to feed findHomography
         src_pts = np.float32([kp1[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
         dst_pts = np.float32([kp2[m.trainIdx].pt for m in good]).reshape(-1, 1, 2)
         M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
@@ -107,10 +109,7 @@ def main():
     # Draws lines from matching
     image3 = cv2.drawMatches(image1, kp1, image2, kp2, good, None, **draw_params)
 
-    # Change image brightness
-    # image_gui3 = image_gui3 - 50
-
-    # Put image1 in image2, and make average of pixels
+    # Put image1 in image2, on the place that resembles it the most
     image_stitched[int(dst[0][0][1]):int(dst[0][0][1])+h, int(dst[0][0][0]):int(dst[0][0][0])+w] = ((image1.astype(float) + image_stitched[int(dst[0][0][1]):int(dst[0][0][1])+h, int(dst[0][0][0]):int(dst[0][0][0])+w].astype(float))/2).astype(np.uint8)
 
     # -----------------------------------------------------
