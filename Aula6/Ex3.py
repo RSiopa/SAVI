@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 from copy import deepcopy
+from random import randint
 
 import cv2
 import argparse
@@ -18,7 +19,7 @@ def main():
     # -----------------------------------------------------
 
     # Start video
-    image1 = cv2.imread("../Aula6/images/santorini/1.png")
+    image1 = cv2.imread("../Aula6/images/castle/1.png")
     image2 = cv2.imread("../Aula6/images/castle/original.jpg")
 
     sift = cv2.SIFT_create(500)
@@ -36,9 +37,12 @@ def main():
     image_gray1 = cv2.cvtColor(image_gui1, cv2.COLOR_BGR2GRAY)
     kp1, des1 = sift.detectAndCompute(image_gray1, None)
 
-    image_kp1 = cv2.drawKeypoints(image_gui1, kp1, None, flags=0)
-    # image_kp1 = cv2.drawKeypoints(image_gui1, kp1, image_gui1, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-
+    # image_kp1 = cv2.drawKeypoints(image_gui1, kp1, None, flags=0)
+    for idx, key_point in enumerate(kp1):
+        x1 = int(key_point.pt[0])
+        y1 = int(key_point.pt[1])
+        color = (randint(0, 255), randint(0, 255), randint(0, 255))
+        cv2.circle(image_gui1, (x1, y1), 50, color, 3)
 
 
     image_gui2 = deepcopy(image2)
@@ -46,9 +50,12 @@ def main():
     image_gray2 = cv2.cvtColor(image_gui2, cv2.COLOR_BGR2GRAY)
     kp2, des2 = sift.detectAndCompute(image_gray2, None)
 
-    image_kp2 = cv2.drawKeypoints(image_gui2, kp2, None, flags=0)
-    # image_kp2 = cv2.drawKeypoints(image_gui2, kp2, image_gui2, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-
+    # image_kp2 = cv2.drawKeypoints(image_gui2, kp2, None, flags=0)
+    for idx, key_point in enumerate(kp2):
+        x2 = int(key_point.pt[0])
+        y2 = int(key_point.pt[1])
+        color = (randint(0, 255), randint(0, 255), randint(0, 255))
+        cv2.circle(image_gui2, (x2, y2), 50, color, 3)
 
 
     bf = cv2.BFMatcher()

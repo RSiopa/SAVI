@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 from copy import deepcopy
+from random import randint
 
 import cv2
 import argparse
@@ -27,9 +28,13 @@ def main():
     cv2.namedWindow(window_name1, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(window_name1, 800, 600)
 
-    window_name2 = 'image_stitched'
+    window_name2 = 'image2_drawings'
     cv2.namedWindow(window_name2, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(window_name2, 800, 600)
+
+    window_name3 = 'image_stitched'
+    cv2.namedWindow(window_name3, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(window_name3, 800, 600)
 
     MIN_MATCH_COUNT = 10
 
@@ -39,24 +44,32 @@ def main():
 
     image_gui1 = deepcopy(image1)
 
+    # Keypoint acquisition from image 1
     image_gray1 = cv2.cvtColor(image_gui1, cv2.COLOR_BGR2GRAY)
     kp1, des1 = sift.detectAndCompute(image_gray1, None)
 
-    image_kp1 = cv2.drawKeypoints(image_gui1, kp1, None, flags=0)
-    # image_kp1 = cv2.drawKeypoints(image_gui1, kp1, image_gui1, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-
-
+    # Draw keypoints
+    for idx, key_point in enumerate(kp1):
+        x1 = int(key_point.pt[0])
+        y1 = int(key_point.pt[1])
+        color = (randint(0, 255), randint(0, 255), randint(0, 255))
+        cv2.circle(image_gui1, (x1, y1), 50, color, 3)
 
     image_gui2 = deepcopy(image2)
+    image_gui3 = deepcopy(image2)
 
+    # Keypoint acquisition from image 2
     image_gray2 = cv2.cvtColor(image_gui2, cv2.COLOR_BGR2GRAY)
     kp2, des2 = sift.detectAndCompute(image_gray2, None)
 
-    image_kp2 = cv2.drawKeypoints(image_gui2, kp2, None, flags=0)
-    # image_kp2 = cv2.drawKeypoints(image_gui2, kp2, image_gui2, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    # Draw keypoints
+    for idx, key_point in enumerate(kp2):
+        x2 = int(key_point.pt[0])
+        y2 = int(key_point.pt[1])
+        color = (randint(0, 255), randint(0, 255), randint(0, 255))
+        cv2.circle(image_gui2, (x2, y2), 50, color, 3)
 
-
-
+    # Matching of images
     FLANN_INDEX_KDTREE = 1
     index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
     search_params = dict(checks=50)
@@ -65,11 +78,11 @@ def main():
 
     matches = flann.knnMatch(des1, des2, k=2)
 
-    # Apply ratio test
+    # Apply ratio test to exclude bad matches
     good = []
-    for m, n in matches:
-        if m.distance < 0.7 * n.distance:
-            good.append(m)
+    for best_match, second_best_match in matches:
+        if best_match.distance < 0.7 * second_best_match.distance:
+            good.append(best_match)
 
     if len(good) > MIN_MATCH_COUNT:
         src_pts = np.float32([kp1[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
@@ -79,30 +92,38 @@ def main():
         h, w, c = image1.shape
         pts = np.float32([[0, 0], [0, h - 1], [w - 1, h - 1], [w - 1, 0]]).reshape(-1, 1, 2)
         dst = cv2.perspectiveTransform(pts, M)
-        image2 = cv2.polylines(image2, [np.int32(dst)], True, 255, 3, cv2.LINE_AA)
+
+        # Dray in image2 where image1 is
+        image_gui2 = cv2.polylines(image_gui2, [np.int32(dst)], True, 255, 3, cv2.LINE_AA)
     else:
         print("Not enough matches are found - {}/{}".format(len(good), MIN_MATCH_COUNT))
         matchesMask = None
 
+    # Params for match drawing
     draw_params = dict(matchColor=(0, 255, 0),  # draw matches in green color
                        singlePointColor=None,
                        matchesMask=matchesMask,  # draw only inliers
                        flags=2)
 
-    # cv.drawMatchesKnn expects list of lists as matches.
+    # Draws lines from matching
     image3 = cv2.drawMatches(image1, kp1, image2, kp2, good, None, **draw_params)
 
-    image4 = deepcopy(image2)
-
-    # image4[int(dst[0][0][0]):int(dst[0][0][0])+w, int(dst[0][0][1]):int(dst[0][0][1])+h] = image1
-    # print(dst)
+    # Put image1 in image2, on the place that resembles it the most
+    image_gui3[int(dst[0][0][1]):int(dst[0][0][1])+h, int(dst[0][0][0]):int(dst[0][0][0])+w] = image1
 
     # -----------------------------------------------------
     # Termination
     # -----------------------------------------------------
 
+    # Matching
     cv2.imshow(window_name1, image3)
-    cv2.imshow(window_name2, image4)
+
+    # Image2 drawing
+    cv2.imshow(window_name2, image_gui2)
+
+    # Stitching
+    cv2.imshow(window_name3, image_gui3)
+
     cv2.waitKey(0)
 
 
