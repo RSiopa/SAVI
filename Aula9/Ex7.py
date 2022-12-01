@@ -2,7 +2,7 @@
 import math
 from copy import deepcopy
 from pydoc import locate
-
+from more_itertools import locate
 from matplotlib import cm
 import numpy as np
 import open3d as o3d
@@ -82,7 +82,7 @@ def main():
         norm_a = math.sqrt(nx**2 + ny**2 + nz**2)
         angle = math.acos(ab/(norm_a * norm_b)) * 180/math.pi
 
-        if (angle - 90) < angle_tolerance:
+        if abs(angle - 90) < angle_tolerance:
             horizontal_idxs.append(idx)
 
     horizontal_cloud = point_cloud.select_by_index(horizontal_idxs)
@@ -102,7 +102,7 @@ def main():
 
     o3d.visualization.draw_geometries(entities, zoom=view['trajectory'][0]['zoom'],
                                       front=view['trajectory'][0]['front'], lookat=view['trajectory'][0]['lookat'],
-                                      up=view['trajectory'][0]['up'], point_show_normal=True)
+                                      up=view['trajectory'][0]['up'], point_show_normal=False)
 
     # o3d.io.write_point_cloud('factory_isolated.ply', cloud_building, write_ascii=False, compressed=False, print_progress=False)
 

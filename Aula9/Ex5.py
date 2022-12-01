@@ -2,7 +2,7 @@
 
 from copy import deepcopy
 from pydoc import locate
-
+from more_itertools import locate
 from matplotlib import cm
 import numpy as np
 import open3d as o3d

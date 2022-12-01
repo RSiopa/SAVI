@@ -2,7 +2,7 @@
 import math
 from copy import deepcopy
 from pydoc import locate
-
+from more_itertools import locate
 from matplotlib import cm
 import numpy as np
 import open3d as o3d
@@ -102,9 +102,7 @@ def main():
 
     o3d.visualization.draw_geometries(entities, zoom=view['trajectory'][0]['zoom'],
                                       front=view['trajectory'][0]['front'], lookat=view['trajectory'][0]['lookat'],
-                                      up=view['trajectory'][0]['up'], point_show_normal=True)
-
-    # o3d.io.write_point_cloud('factory_isolated.ply', cloud_building, write_ascii=False, compressed=False, print_progress=False)
+                                      up=view['trajectory'][0]['up'], point_show_normal=False)
 
 
 if __name__ == "__main__":

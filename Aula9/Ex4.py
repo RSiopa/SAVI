@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from copy import deepcopy
-
+from more_itertools import locate
 from matplotlib import cm
 import numpy as np
 import open3d as o3d
