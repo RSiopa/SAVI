@@ -48,11 +48,15 @@ def main():
 
     p.crop(-0.9, -0.9, -0.3, 0.9, 0.9, 0.4)
 
+    outliers = p.findPlane()
+
     # -----------------------------------------------------
     # Visualization
     # -----------------------------------------------------
 
-    entities = [p.pcd]
+    p.inliers.paint_uniform_color([0, 1, 1])
+
+    entities = [p.pcd, outliers]
 
     frame = o3d.geometry.TriangleMesh().create_coordinate_frame(size=0.5, origin=np.array([0., 0., 0.]))
     entities.append(frame)
