@@ -54,7 +54,7 @@ def main():
     # Execution
     # -----------------------------------------------------
 
-    p.preProcess(voxel_size=0)
+    p.preProcess()
 
     p.transform(-108, 0, 0, 0, 0, 0)
     p.transform(0, 0, -37, 0, 0, 0)
@@ -63,12 +63,9 @@ def main():
     p.crop(-0.9, -0.9, -0.3, 0.9, 0.9, 0.4)
 
     outliers = p.findPlane()
-
+    print(outliers)
     # Clustering
-    cluster_idxs = list(outliers.cluster_dbscan(eps=0.05, min_points=60, print_progress=True))
-
-    print(cluster_idxs)
-
+    cluster_idxs = list(outliers.cluster_dbscan(eps=0.03, min_points=60, print_progress=True))
     object_idxs = list(set(cluster_idxs))
     object_idxs.remove(-1)
 
@@ -92,16 +89,15 @@ def main():
 
     cereal_box_model = o3d.io.read_point_cloud('data/cereal_box_2_2_40.pcd')
 
-    for object in objects:
+    for object_idx, object in enumerate(objects):
         print("Apply point-to-point ICP to object " + str(object['idx']))
 
-        trans_init = np.asarray([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+        trans_init = np.asarray([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0.0, 0.0, 0.0, 1.0]])
 
         reg_p2p = o3d.pipelines.registration.registration_icp(cereal_box_model, object['points'], 2, trans_init, o3d.pipelines.registration.TransformationEstimationPointToPoint())
 
         print(reg_p2p.inlier_rmse)
         object['rmse'] = reg_p2p.inlier_rmse
-
         # draw_registration_result(cereal_box_model, object['points'], reg_p2p.transformation)
 
     minimum_rmse = 10e8
@@ -110,14 +106,14 @@ def main():
     for object_idx, object in enumerate(objects):
         if object['rmse'] < minimum_rmse:
             minimum_rmse = object['rmse']
-            cereal_box_idx = object_idx
+            cereal_box_object_idx = object_idx
 
     # -----------------------------------------------------
     # Visualization
     # -----------------------------------------------------
 
     p.inliers.paint_uniform_color([0, 1, 1])
-    entities = [p.pcd]
+    entities = []
 
     frame = o3d.geometry.TriangleMesh().create_coordinate_frame(size=0.5, origin=np.array([0., 0., 0.]))
     entities.append(frame)
@@ -125,7 +121,7 @@ def main():
     bbox_to_draw = o3d.geometry.LineSet.create_from_axis_aligned_bounding_box(p.bbox)
     entities.append(bbox_to_draw)
 
-    for object in objects:
+    for object_idx, object in enumerate(objects):
         entities.append(object['points'])
 
     # Make a more complex open3D window to show object labels on top of 3d
@@ -137,21 +133,21 @@ def main():
     widget3d = gui.SceneWidget()
     widget3d.scene = rendering.Open3DScene(w.renderer)
     widget3d.scene.set_background([0, 0, 0, 1])
-    mat = rendering.MaterialRecord()
-    mat.shader = "defaultUnlit"
-    mat.point_size = 5 * w.scaling
+    material = rendering.MaterialRecord()
+    material.shader = "defaultUnlit"
+    material.point_size = 2 * w.scaling
 
     for entity_idx, entity in enumerate(entities):
-        widget3d.scene.add_geometry("Entity" + str(entity_idx), entity, mat)
+        widget3d.scene.add_geometry("Entity" + str(entity_idx), entity, material)
 
     for object_idx, object in enumerate(objects):
         label_pos = [object['center'][0], object['center'][1], object['center'][2] + 0.15]
 
         label_text = object['idx']
-        if object_idx ==:
+        if object_idx == cereal_box_object_idx:
+            label_text += ' (Cereal Box)'
 
-
-        label = widget3d.add_3d_label(label_pos, object['idx'])
+        label = widget3d.add_3d_label(label_pos, label_text)
         label.color = gui.Color(object['color'][0], object['color'][1], object['color'][2])
         label.scale = 2
 

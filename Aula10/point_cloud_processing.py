@@ -19,7 +19,7 @@ class PointCloudProcessing:
         self.pcd = self.pcd.voxel_down_sample(voxel_size=0.02)
 
         self.pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.2, max_nn=30))
-        self.pcd.orient_normals_to_align_with_direction(orientation_reference=np.array([0., 0., 0.]))
+        self.pcd.orient_normals_to_align_with_direction(orientation_reference=np.array([0., 0., 1.]))
 
     def transform(self, r, p, y, tx, ty, tz):
 
@@ -49,7 +49,7 @@ class PointCloudProcessing:
         bbox_points = o3d.utility.Vector3dVector(np_points)
 
         self.bbox = o3d.geometry.AxisAlignedBoundingBox.create_from_points(bbox_points)
-        self.bbox.color = [1, 0, 0]
+        self.bbox.color = (1, 0, 0)
 
         self.pcd = self.pcd.crop(self.bbox)
 
@@ -61,8 +61,3 @@ class PointCloudProcessing:
 
         outlier_cloud = self.pcd.select_by_index(inlier_idxs, invert=True)
         return outlier_cloud
-
-    def __str__(self):
-        text = 'Segmented plane from pc with ' + str(len(self.point_cloud.points)) + ' with ' + str(len(self.inlier_cloud.points)) + ' inliers. '
-        text += '\nPlane: ' + str(self.a) + ' x + ' + str(self.b) + ' y + ' + str(self.c) + ' z + ' + str(self.d) + ' = 0'
-        return text
