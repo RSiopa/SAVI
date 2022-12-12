@@ -41,7 +41,7 @@ def main():
     # Execution
     # -----------------------------------------------------
 
-    p.preProcess(voxel_size=0)
+    p.preProcess(voxel_size=0.01)
 
     p.transform(-108, 0, 0, 0, 0, 0)
     p.transform(0, 0, -37, 0, 0, 0)
