@@ -2,6 +2,8 @@
 import pickle
 from copy import deepcopy
 from random import randint, uniform
+from statistics import mean
+from tqdm import tqdm
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,7 +20,7 @@ def main():
     # -----------------------------------------------------
 
     # Create the dataset
-    dataset = Dataset(3000, 0.3, 14)
+    dataset = Dataset(3000, 0.9, 14, sigma=3)
     loader = torch.utils.data.DataLoader(dataset=dataset, batch_size=256, shuffle=True)
 
     # for batch_idx, (xs_ten, ys_ten_labels) in enumerate(loader):
@@ -32,9 +34,10 @@ def main():
     model.to(device)  # Move model to cpu if exists
 
     learning_rate = 0.01
-    maximum_num_epochs = 50
+    maximum_num_epochs = 500
+    termination_loss_threshold = 7.5
     criterion = torch.nn.MSELoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     # -----------------------------------------------------
     # Training
@@ -45,7 +48,8 @@ def main():
 
     while True:
 
-        for batch_idx, (xs_ten, ys_ten_labels) in enumerate(loader):
+        losses = []
+        for batch_idx, (xs_ten, ys_ten_labels) in tqdm(enumerate(loader), total=len(loader), desc='Training batchesfor Epoch ' + str(idx_epoch)):
 
             xs_ten = xs_ten.to(device)
             ys_ten_labels = ys_ten_labels.to(device)
@@ -65,9 +69,15 @@ def main():
             # update parameters
             optimizer.step()
 
-        idx_epoch += 1
+            losses.append(loss.data.item())
 
+        epoch_loss = mean(losses)
+
+        idx_epoch += 1
         if idx_epoch > maximum_num_epochs:
+            break
+        elif epoch_loss < termination_loss_threshold:
+            print('Reached target loss')
             break
 
     # -----------------------------------------------------
@@ -78,8 +88,8 @@ def main():
     ys_np_predicted = ys_ten_predicted.cpu().detach().numpy()
 
     # plt.clf()
-    plt.plot(dataset.xs_np, dataset.ys_np_labels, 'go', label='labels')
-    plt.plot(dataset.xs_np, ys_np_predicted, '--r', label='Predictions', alpha=0.5)
+    plt.plot(dataset.xs_np, dataset.ys_np_labels, 'g.', label='labels')
+    plt.plot(dataset.xs_np, ys_np_predicted, 'rx', label='Predictions')
     plt.legend(loc='best')
     plt.show()
 

@@ -2,6 +2,8 @@
 import pickle
 from copy import deepcopy
 from random import randint, uniform
+from statistics import mean
+from tqdm import tqdm
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,8 +20,11 @@ def main():
     # -----------------------------------------------------
 
     # Create the dataset
-    dataset = Dataset(3000, 0.3, 14)
-    loader = torch.utils.data.DataLoader(dataset=dataset, batch_size=256, shuffle=True)
+    dataset_train = Dataset(3000, 0.9, 14, sigma=3)
+    loader_train = torch.utils.data.DataLoader(dataset=dataset_train, batch_size=256, shuffle=True)
+
+    dataset_test = Dataset(3000, 0.9, 14, sigma=3)
+    # loader_test = torch.utils.data.DataLoader(dataset=dataset_test, batch_size=256, shuffle=True)
 
     # for batch_idx, (xs_ten, ys_ten_labels) in enumerate(loader):
     #     print('batch ' + str(batch_idx) + ' has xs of size ' + str(xs_ten.shape))
@@ -32,9 +37,10 @@ def main():
     model.to(device)  # Move model to cpu if exists
 
     learning_rate = 0.01
-    maximum_num_epochs = 50
+    maximum_num_epochs = 150
+    termination_loss_threshold = 7.5
     criterion = torch.nn.MSELoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     # -----------------------------------------------------
     # Training
@@ -45,7 +51,9 @@ def main():
 
     while True:
 
-        for batch_idx, (xs_ten, ys_ten_labels) in enumerate(loader):
+        losses = []
+        epoch_losses = []
+        for batch_idx, (xs_ten, ys_ten_labels) in tqdm(enumerate(loader_train), total=len(loader_train), desc='Training batchesfor Epoch ' + str(idx_epoch)):
 
             xs_ten = xs_ten.to(device)
             ys_ten_labels = ys_ten_labels.to(device)
@@ -65,23 +73,47 @@ def main():
             # update parameters
             optimizer.step()
 
-        idx_epoch += 1
+            losses.append(loss.data.item())
 
+        epoch_loss = mean(losses)
+        epoch_losses.append(epoch_loss)
+
+        idx_epoch += 1
         if idx_epoch > maximum_num_epochs:
+            break
+        elif epoch_loss < termination_loss_threshold:
+            print('Reached target loss')
             break
 
     # -----------------------------------------------------
     # Termination
     # -----------------------------------------------------
 
-    ys_ten_predicted = model.forward(dataset.xs_ten.to(device))
+    ys_ten_predicted = model.forward(dataset_train.xs_ten.to(device))
     ys_np_predicted = ys_ten_predicted.cpu().detach().numpy()
 
     # plt.clf()
-    plt.plot(dataset.xs_np, dataset.ys_np_labels, 'go', label='labels')
-    plt.plot(dataset.xs_np, ys_np_predicted, '--r', label='Predictions', alpha=0.5)
+    plt.title('Train dataset data')
+    plt.plot(dataset_train.xs_np, dataset_train.ys_np_labels, 'g.', label='labels')
+    plt.plot(dataset_train.xs_np, ys_np_predicted, 'rx', label='Predictions')
+    plt.legend(loc='best')
+
+    plt.figure()
+    plt.title('Training loss')
+    plt.plot(range(0, len(epoch_losses)), epoch_losses, '-b')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
     plt.legend(loc='best')
     plt.show()
+
+    plt.figure()
+    ys_ten_predicted = model.forward(dataset_test.xs_ten.to(device))
+    ys_np_predicted = ys_ten_predicted.cpu().detach().numpy()
+
+    plt.title('Test dataset data')
+    plt.plot(dataset_test.xs_np, dataset_test.ys_np_labels, 'g.', label='labels')
+    plt.plot(dataset_test.xs_np, ys_np_predicted, 'rx', label='Predictions')
+    plt.legend(loc='best')
 
 
 if __name__ == "__main__":
