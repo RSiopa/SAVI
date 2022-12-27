@@ -2,12 +2,15 @@
 
 import random
 from statistics import mean
+
+from colorama import Fore, Style
 from sklearn.model_selection import train_test_split
 from torchvision.transforms import transforms
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import torch
 
+from Aula12.classification_visualizer import ClassificationVisualizer
 from Aula12.data_visualizer import DataVisualizer
 from Aula12.model import Model
 from dataset import Dataset
@@ -20,13 +23,15 @@ def main():
     # Initialization
     # -----------------------------------------------------
 
+    resume_training = False
+    model_path = 'model.pkl'
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
     model = Model()
-    model.to(device)  # Move model to cpu if exists
+    model.to(device)
 
-    learning_rate = 0.01
-    maximum_num_epochs = 150
+    learning_rate = 0.001
+    maximum_num_epochs = 100
     termination_loss_threshold = 0.001
     loss_function = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -39,49 +44,17 @@ def main():
     dataset_path = '../datasets/catsxdogs/train'
     image_filenames = glob.glob(dataset_path + '/*.jpg')
 
-    image_filenames = random.sample(image_filenames, k=900)
+    image_filenames = random.sample(image_filenames, k=400)
 
     train_image_filenames, test_image_filenames = train_test_split(image_filenames, test_size=0.2)
 
     dataset_train = Dataset(train_image_filenames)
     loader_train = torch.utils.data.DataLoader(dataset=dataset_train, batch_size=256, shuffle=True)
 
+    dataset_test = Dataset(test_image_filenames)
+    loader_test = torch.utils.data.DataLoader(dataset=dataset_test, batch_size=256, shuffle=True)
+
     tensor_to_pil_image = transforms.ToPILImage()
-    for image_t, label_t in loader_train:
-        print(image_t.shape)
-
-        num_images = image_t.shape[0]
-        image_idxs = random.sample(range(0, num_images), k=25)
-        print(image_idxs)
-
-        fig = plt.figure()
-        for subplot_idx, image_idx in enumerate(image_idxs, start=1):
-
-            image_pil = tensor_to_pil_image(image_t[image_idx, :, :, :])
-            ax = fig.add_subplot(5, 5, subplot_idx)
-            ax.xaxis.set_ticklabels([])
-            ax.yaxis.set_ticklabels([])
-            ax.xaxis.set_ticks([])
-            ax.yaxis.set_ticks([])
-
-            label = label_t[image_idx].data.item()
-            class_name = 'dog' if label == 0 else 'cat'
-            ax.set_xlabel(class_name)
-
-            plt.imshow(image_pil)
-
-        plt.show()
-        exit(0)
-
-    dataset_test = Dataset(500, 0.9, 14, sigma=3)
-    # loader_test = torch.utils.data.DataLoader(dataset=dataset_test, batch_size=256, shuffle=True)
-
-    # for batch_idx, (xs_ten, ys_ten_labels) in enumerate(loader):
-    #     print('batch ' + str(batch_idx) + ' has xs of size ' + str(xs_ten.shape))
-    # exit(0)
-
-    for image_t, label_t in loader_train:
-        model.forward(image_t)
 
     # -----------------------------------------------------
     # Training
@@ -90,14 +63,30 @@ def main():
     loss_visualizer = DataVisualizer('Loss')
     loss_visualizer.draw([0, maximum_num_epochs], [termination_loss_threshold, termination_loss_threshold], layer='threshold', marker='--', markersize=1, color=[0.5, 0.5, 0.5], alpha=1, label='threshold', x_label='Epochs', y_label='Loss')
 
-    model.to(device)
-    idx_epoch = 0
-    # training the model
-    epoch_losses = []
+    test_visualizer = ClassificationVisualizer('Test Images')
+
+    # Resume training
+    if resume_training:
+        checkpoint = torch.load(model_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        idx_epoch = checkpoint['epoch']
+        epoch_train_losses = checkpoint['train_losses']
+        epoch_test_losses = checkpoint['test_losses']
+
+        # model.train()
+    else:
+        idx_epoch = 0
+        epoch_train_losses = []
+        epoch_test_losses = []
+    # -----------
+
+    model.to(device)  # move the model variable to the gpu if one exists
+
     while True:
 
-        losses = []
-        for batch_idx, (image_t, label_t) in tqdm(enumerate(loader_train), total=len(loader_train), desc='Training batchesfor Epoch ' + str(idx_epoch)):
+        train_losses = []
+        for batch_idx, (image_t, label_t) in tqdm(enumerate(loader_train), total=len(loader_train), desc=Fore.GREEN + 'Training batches for Epoch ' + str(idx_epoch) + Style.RESET_ALL):
 
             image_t = image_t.to(device)
             label_t = label_t.to(device)
@@ -117,27 +106,65 @@ def main():
             # update parameters
             optimizer.step()
 
-            losses.append(loss.data.item())
+            train_losses.append(loss.data.item())
 
-        epoch_loss = mean(losses)
-        epoch_losses.append(epoch_loss)
+        epoch_train_loss = mean(train_losses)
+        epoch_train_losses.append(epoch_train_loss)
 
-        loss_visualizer.draw([list(range(0, len()), [termination_loss_threshold, termination_loss_threshold],
-                             layer='threshold', marker='--', markersize=1, color=[0.5, 0.5, 0.5], alpha=1,
-                             label='threshold', x_label='Epochs', y_label='Loss')
+        test_losses = []
+        for batch_idx, (image_t, label_t) in tqdm(enumerate(loader_test), total=len(loader_test),
+                                                  desc=Fore.GREEN + 'Testing batches for Epoch ' + str(
+                                                          idx_epoch) + Style.RESET_ALL):
+            image_t = image_t.to(device)
+            label_t = label_t.to(device)
 
-        idx_epoch += 1
+            # Apply the network to get the predicted ys
+            label_t_predicted = model.forward(image_t)
+
+            # Compute the error based on the predictions
+            loss = loss_function(label_t_predicted, label_t)
+
+            test_losses.append(loss.data.item())
+
+            test_visualizer.draw(image_t, label_t, label_t_predicted)
+
+        # Compute the loss for the epoch
+        epoch_test_loss = mean(test_losses)
+        epoch_test_losses.append(epoch_test_loss)
+
+        # Visualization
+        loss_visualizer.draw(list(range(0, len(epoch_train_losses))), epoch_train_losses, layer='train loss', marker='-', markersize=1, color=[0,0,0.7], alpha=1, label='Train Loss', x_label='Epochs', y_label='Loss')
+
+        loss_visualizer.draw(list(range(0, len(epoch_test_losses))), epoch_test_losses, layer='test loss', marker='-',
+                             markersize=1, color=[1, 0, 0.7], alpha=1, label='Test Loss', x_label='Epochs',
+                             y_label='Loss')
+
+        loss_visualizer.recomputeAxesRanges()
+
+        print(Fore.BLUE + 'Epoch ' + str(idx_epoch) + ' Loss ' + str(epoch_train_loss) + Style.RESET_ALL)
+
+        # Save checkpoint
+        model.to('cpu')
+        torch.save({
+            'epoch': idx_epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'train_losses': epoch_train_losses,
+            'test_losses': epoch_test_losses,
+        }, model_path)
+        model.to(device)
+
+        idx_epoch += 1  # go to next epoch
+        # Termination criteria
         if idx_epoch > maximum_num_epochs:
+            print('Finished training. Reached maximum number of epochs.')
             break
-        elif epoch_loss < termination_loss_threshold:
-            print('Reached target loss')
+        elif epoch_train_loss < termination_loss_threshold:
+            print('Finished training. Reached target loss.')
             break
 
-    # -----------------------------------------------------
-    # Termination
-    # -----------------------------------------------------
-
-
+    key = plt.waitforbuttonpress(0)
+    exit(0)
 
 
 if __name__ == "__main__":
